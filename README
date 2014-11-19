@@ -1,0 +1,53 @@
+
+CIS 457 Project 6: Reliable File Transfer over UDP
+
+Objective: Implement reliability, learn about network simulation.
+
+Deliverables: You must turn in your code on blackboard by the start of your lab session on the due date. You must turn in documentation of your program (describing how your code provides reliability) in hard copy during lab on the due date. A group evaluation form in hard copy is due at the next lecture. You must demo your program on the due date (or before) in lab. If you do not demonstrate your project, you will recieve no credit (all group members should be present).
+
+Teams: This project should be done in groups of 2 or 3. You may not work alone
+
+Grading: This project is worth 100 points, as described below.
+Program Specifications
+
+You must write a client and server to support file transfer. The client should send to the server a request to initiate a transfer of a specific file. Upon recieving the request, if the file exists, it should be sent to the client. Be sure your program works with all file types, not just text files.
+
+The client and server both must be written in C, C++, Python, or Java using sockets.
+
+    When the server starts, it should wait for a client connection (on a port number either obtained as a command line option or input by the user).
+    When the client starts, it should connect to the server and send a request for a file. This request may be formatted in any way your group finds convenient.
+    The server IP address, server port number, and file name may either be taken by the client program as user input, or as command line options.
+    Upon recieving a request, the server should read the requested file if it exists, and send it to the client, which should write the file locally. The file transfer must meet the following requirements:
+        UDP sockets must be used.
+        The data in each packet, including any header information you add, must be 1024 bytes or less.
+        The file transfer must be reliable (recover from any packet loss, packet corruption, and packet reordering). Your relaibility must be implemented as a sliding window containing at least 5 packets. You may not get around reordering by implementing a single packet stop-and-wait protocol, but you also may not have more than 10 unacknowledged data packets outstanding on the line at a time (or 10240 bytes, if your design makes counting by packets inconvenient). 
+    The client and server should each print to the screen each time they send or recieve a packet.
+    Do not load the entire file you will be sending into memory at once. This is not realistic for sending large files. 
+
+Lab environment
+
+For this lab we will be using the Mininet virtual network. You may obtain a copy of the mininet virtual machine from /lab/networking/Mininet on Datacomm or EOS (copy it to your home directory, do not run it from that location), or from mininet.org. This is usabable with any Virtual Machine software such as VirtualBox or VMWare Player.
+
+The virtual machine has no graphical interface, only a text console. To use graphical programs, you must log in to the VM remotely. The username and password for the virtual machine are both mininet. After logging in, use the ifconfig command to find your IP address, and then SSH into the VM with the -Y flag to forward windows to your local machine. You can run a defualt tolology (all we will need), by running the command sudo mn -x. This topology has three nodes: two end hosts and a switch. Starting the simulator should produce four windows. These are the consoles on these three devices, plus a controller (used for advanced programming of switch behavior). We will not use the controller window.
+
+Each of the hosts has a virtual network interface connected to the switch, and can send data to the other through the switch just like a real network. Running wireshark on either host or the switch should work as expected, and running any program on the host should work as expected, with the exception that they can only communicate on the virtual network. Your sender and reciever should work on the two mininet hosts.
+
+To simulate loss, reordering, and corruption, we will run commands on the virtual switch, using netem. Documentation is available at http://www.linuxfoundation.org/collaborate/workgroups/networking/netem and examples will be shown. Netem only affects outgoing packets, so, when testing, be sure to run any commands on both of the switch's network interfaces to simulate problems in both directions of the connection.
+Documentation
+
+Please document your design. This document should be 2-4 reasonably formatted pages. In it, you should describe any design decisions you made and why. You should also document the structure of any messages you send over the network. To implement reliability, you will need to send some information aside from just the file data. Document this structure, and how you use it to provide reliability.
+Grading
+
+There will be a total of 100 points, divided as follows:
+Criteria	Points
+Transfer request	10
+File transfer (on error free line) working for text files	20
+File transfer (on error free line) working for other file types (pdf, jpg, etc)	10
+Good documentation of your design	10
+Simulation of packet loss	10
+File transfer works with packet corruption	10
+File transfer works with reordering	10
+File transfer works with loss	10
+File reading/writing	5
+Runtime error handling	5
+
