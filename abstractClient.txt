@@ -1,0 +1,30 @@
+While Running:
+    user input
+        filename
+        server IP
+        Port
+
+    send init req
+    
+    wait for init packet
+        checksum
+        if validRequest:
+            get filesize
+            get windowsize
+            set up Buffer = windowSize
+            create local file
+
+            while fileIncomplete:
+                recv Data
+                    put in buffer (unordered)
+                    send ack
+                    order buffer
+                    check first element in buffer to write
+                    
+                    if write:
+                        pop off buffer
+                        write to file
+                        check fileIncomplete -> set false when complete
+                        send ack
+
+        

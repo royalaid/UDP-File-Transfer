@@ -1,0 +1,32 @@
+While Running:
+    user input
+        timeout
+        port
+        window element num = N
+        *seg size static
+
+    listen for req
+        rec initial
+            process req
+            locate file
+            create window
+            load N bytes into window
+
+        send Server Init
+            filesize
+            window
+
+        while fileIncomplete:
+            for x in window:
+                send x
+
+            some timeout magic:
+                if recv ack:
+                    verify ack
+                        checksum, seq, etc???
+                        if fileIncomplete: <---- not just boolean, actually check seq
+                            drop ack seg from window
+                            add next seg to window
+                        else:
+                            set fileIncomplete False
+

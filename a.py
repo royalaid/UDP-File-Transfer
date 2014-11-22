@@ -1,6 +1,8 @@
 import sys
 import os
 import logging
+
+# clear logging TODO
 logging.basicConfig(format='%(message)s',
                     filename='log.log',
                     level=logging.DEBUG)
