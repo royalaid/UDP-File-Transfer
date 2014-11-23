@@ -24,7 +24,7 @@ While Running:
                 if recv ack:
                     verify ack
                         checksum, seq, etc???
-                        if fileIncomplete: <---- not just boolean, actually check seq
+                        if fileIncomplete:# not boolean, actually check seq
                             drop ack seg from window
                             add next seg to window
                         else:

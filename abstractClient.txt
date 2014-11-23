@@ -16,8 +16,9 @@ While Running:
 
             while fileIncomplete:
                 recv Data
-                    put in buffer (unordered)
-                    send ack
+                    verify check/?seq?
+                    put data(not packet) in buffer (unordered)
+                    send ack - seq num
                     order buffer
                     check first element in buffer to write
                     
