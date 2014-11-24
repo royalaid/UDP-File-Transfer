@@ -10,10 +10,11 @@ logging.basicConfig(format='%(message)s',
 logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 
 SIZE = 1024  #max packet size as defined by spec
-elementSize = 1  # size of element in bytes
+elementSize = 1  # size of element in bytes TODO ?user determined?
 running = True
 fileIncomplete = True
-seqPointer = -1  #no packets set yet
+seqPointer = -1  #no packets set yet TODO should be next valid to use
+MAXseqNUM = 65535
 # key = seq
 # value = (data,ackBool)
 window = {}
@@ -64,73 +65,100 @@ while running:
 
     while fileIncomplete:
 
+        # shoot out entire window if not ack-ed
         for x in window.keys():
             if not window[x][2]:
                 packet = constructPacket(window[x],x)
                 s.sendto(packet,(cAddr,port))
-
+                # update sequence pointer? TODO 
 
         seqNums = listenForAcks(s)
-
-        # check if the file is incomplete
-
-        # add new elements
-        # mark appropriate remaining ack elements
-
-
-def removeElements(w, seqNums):
+        
+        removeAndSlideElements(w,seqNums,f,seqPointer,elementSize,MAXseqNUM)
+       
+       # TODO check if file incomplete
+        
+def removeAndSlideElements(w, s, f, sp, es, ms):
     """ remove appropriate elements from window
-             appropriate = consecutive lowest seq
+        and set ack-ed element
+        appropriate = consecutive lowest seq
+        also slides window by adding bytes from file
     """
-    dangerzone = False
-    actualLowest = []
-    keys = w.keys()
-    keys.sort()
-    seqNums.sort()
+    wkeys = w.keys()
+    delCount = 0
 
-    for x in range(1,len(keys)):
-        if (keys[x] - keys[x-1]) > windowLength:
-            dangerzone = True
+    if dangerzone(w):
+        properSort(wkeys,s)
+    else:
+        wkeys = wkeys.sort()
+        s = s.sort()
 
-        if dangerzone:
-            actualLowest.append(keys[x])
+    setAcks(w,wkeys,s)
 
-    if dangerzone:
-        actualLowestACKed = list(set(seqNums).intersection(actualLowest))
-        restACK = list(set(seqNums).difference(actualLowest))
-        orderedSeqACK = actualLowestToRemove.sort() + rest.sort()
+    # removing elements
+    if wkeys[0] == s[0]:  # we can remove elements
+        for i in range(1,len(s)):
+            if s[i] - s[i-1] == 1 and i != 0:  #contigous from first get del
+                del w[wkeys[i-1]]
+                delCount += 1
+        del w[wkeys[0]]
+        delCount += 1
+        
+    # sliding window
+    for i in range(0,delCount):
+        chunk = f.read(es)
+        w[sp] = (chunk,False)
+        sp = (sp + 1) % ms  
 
-        restKeys = list(set(keys).difference(actualLowest))
-        realOrderedKeys = actualLowest.sort() + restKeys.sort()
+def setAcks(w,wkeys,s):
+    """Sets all ackbools of window elements to true for
+    sequence numbers that we have gotten acks for 
+    """
 
-        # set all ack seq nums to ack=True in window
-        for x in orderedSeqACK:
+    for x in s:
+        if x in wkeys:
             w[x][1] = True
 
-        if (orderedSeqACK[0] == realOrderedKeys[0]):
-            # we can remove some
-            for x in range(1,len(orderedSeqACK)):
-                if orderedSeqACK[x] - orderedSeqACK[x-1] == 1:
-                    del w[x-1]  # TODO also fudged
-                    """
-                    only slide when the 'lowest' value seq num is acked
-                    and if that value is acked then check for consecutive
-                    lowest acks
-                    remove all
 
-                    then add to window from file
-                    """
+    
 
+def properSort(wkeys,s):
+    """Sorts two arguments properly
+    when the window is mid wrap around valid seq numbers the 
+    higher value numbers are actually the lower logical sequence numbers
+    ProperSort orders them according to that principle
+    """
+    
+    s = s.sort()
+    wkeys = wkeys.sort()
+    actslow = []
+    actwklow = []
+    restWK = []
+    restS = []
+
+    for i in range(1,len(s)):
+        if s[i] - s[i-1] > len(wkeys):
+            actslow = s[i:]
+            restS = s[:i]
+            break
+
+    for i in range(1,len(wkeys)):
+        if wkeys[i] - wkeys[i-1] > len(wkeys):
+            actwklow = wkeys[i:]
+            restWK = wkeys[:i]
+            break
+        
+    wkeys = actwklow + restWK 
+    s = actslow + restS 
+
+        
+def dangerzone(window):
+    w = window.keys().sort()
+    if w[0] - w[len(w)-1] > len(w):
+        return True
     else:
-        # not in danger zone
-        for x in seqNums:
-            w[x][1] = True  # set ack to true for all ack seq nums
-
-        if seqNums[0] == keys[0]:
-            #time to slide
-            for x in range(1,len(seqNums)):
-                if seqNums[x] - seqNums[x-1] == 1:
-                    del w[x-1]  # TODO this is fudged
+        return False
+    
 
 def listenForAcks(s):
     """ listens on socket s for packets
