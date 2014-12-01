@@ -2,7 +2,8 @@ import sys
 import socket
 import logging
 import time
-
+import json
+import hashlib
 # clear logging TODO
 logging.basicConfig(format='%(message)s',
                     filename='log.log',
@@ -11,23 +12,38 @@ logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 
 SIZE = 1024  # max packet size as defined by spec
 elementSize = 1  # size of element in bytes TODO ?user determined?
-running = True
+running = False  # TODO testing, change back
 fileIncomplete = True
 seqPointer = -1  # no packets set yet TODO should be next valid to use
-MAXseqNUM = 65535
+seqNum = 0
+MAXSEQNUM = 65535
 # key = seq
 # value = (data,ackBool)
 window = {}
 
 
-def constructPacket(arg1):
+def constructPacket(opcode, curSeq, data=""):
     """TODO: Docstring for constructPacket.
 
-    :arg1: TODO
-    :returns: TODO
-
+    :opcode: OpCodes are as follows, Request = 0, Data = 1, Ack = 2,
+    Retransmit packet = 3, Timeout-Error = 4
+    :data: The data to be transmitted
+    :returns: A json string representing the packet to be sent
     """
-    pass
+    if opcode != 1:
+        packetData = ""
+    else:
+        packetData = data
+
+    curSeq += 1
+    if curSeq > MAXSEQNUM:
+        curSeq = 0
+    # Remeber to make any changes to both the hashPacket and return val encodes
+    hashPacket = json.dumps([opcode, packetData, curSeq], separators=(',', ':'))
+    # For info about this see here http://bit.ly/1vA3gms
+    hashSig = hashlib.sha1(hashPacket.encode("UTF-8")).hexdigest()
+    return json.dumps([opcode, packetData, curSeq, hashSig],
+                      separators=(',', ':'))
 
 
 def removeAndSlideElements(w, s, f, sp, es, ms):
@@ -208,7 +224,7 @@ while running:
         seqNums = listenForAcks(s)
 
         removeAndSlideElements(window, seqNums, f, seqPointer,
-                               elementSize, MAXseqNUM)
-        # TODO changed w to Window
+                               elementSize, MAXSEQNUM)
+        # NOTE changed w to Window
 
         # TODO check if file complete

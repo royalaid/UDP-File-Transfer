@@ -32,6 +32,11 @@ while loop and connected:  #not sure about connected TODO
     curFileSeg = f.read(BYTES)
 
     # configure checksum
+
+    # To check the hash take the received packet, decode the json, reencode the
+    # json based on what is done in the server (extract to tools file?) and then
+    # hash the new json string and check against the parsed hash/truncated hash
+
     # determine if sending
 
 
