@@ -34,7 +34,7 @@ while True:
     if os.path.isfile(filename):
         filename += '_new'
     f = open(filename, "wb")
-    s.sendto(reqPacket, ('', 1234))
+    s.sendto(reqPacket, ('148.61.112.111', 1234))
 
     (data, addr) = s.recvfrom(1024)
     recvPacket = json.loads(data)
