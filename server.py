@@ -12,7 +12,9 @@ logging.basicConfig(format='%(message)s',
                     filename='log.log',
                     level=logging.DEBUG)
 logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
-
+port = 1234
+timeout = 0.01
+windowLength = 10
 SIZE = 1024  # max packet size as defined by spec
 elementSize = 687  # size of element in bytes TODO ?user determined?
 running = True  # TODO testing, change back
@@ -33,15 +35,21 @@ def removeAndSlideElements(w, s, f, sp, es, ms):
         w: Window (Dictionary), s: Sequence Numbers (list), f: File,
         sp: sequence pointer, es: element size, ms: max sequence number
     """
+    print "inside remove and slide"
     wkeys = w.keys()
+    print "wkeys : " + str(repr(wkeys))
     delCount = 0
 
     if dangerzone(w):
+        print "in the dangerzone"
+        print "doing a proper sort"
         properSort(wkeys, s)
     else:
+        print "regular sorting"
         wkeys.sort()
         s.sort()
 
+    print " set acks"
     setAcks(w, wkeys, s)
 
     # removing elements
@@ -67,7 +75,7 @@ def setAcks(w, wkeys, s):
 
     for x in s:
         if x in wkeys:
-            w[x][1] = True
+            w[x] = (w[x][0],True)
 
 
 def properSort(wkeys, s):
@@ -77,8 +85,8 @@ def properSort(wkeys, s):
     ProperSort orders them according to that principle
     """
 
-    s = s.sort()
-    wkeys = wkeys.sort()
+    s.sort()
+    wkeys.sort()
     actslow = []
     actwklow = []
     restWK = []
@@ -185,10 +193,7 @@ except:
 
 '''
 print "server running..."
-port = 1234
-timeout = 100
-windowLength = 6
-##############################
+#############################
 # Listen for initial request #
 ##############################
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -212,24 +217,30 @@ while True:
             print "sent packet size"
             # TODO Loop until file is valid
 
-            # fill window
+            # fill initial window
             for x in range(0, windowLength):
                 chunk = f.read(elementSize)
-                window[x] = (chunk, False)
-                seqPointer = x
+                if len(chunk) > 0:
+                    window[x] = (chunk, False)
+                    seqPointer = x
+                else:
+                    window[x] = (chunk, True)
 
             while fileIncomplete:
 
                 # Check for completion of file transfer
-
+                pid = os.fork()
                 # shoot out entire window if not ack-ed
-                for x in window.keys():
-                    if not window[x][1]:
-                        packet, seqNum = constructPacket(1, x, window[x][0])
-                        s.sendto(packet, cAddr)
+                if (pid == 0):
+                    for x in window.keys():
+                        if not window[x][1]:
+                            packet, seqNum = constructPacket(1, x, window[x][0])
+                            s.sendto(packet, cAddr)
+                    sys.exit()
 
                 seqNums = listenForAcks(s)
-
+                print "seqNums = "
+                print seqNums
                 removeAndSlideElements(window, seqNums, f, seqPointer,
                                 elementSize, MAXSEQNUM)
 
