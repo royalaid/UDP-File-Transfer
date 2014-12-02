@@ -14,7 +14,7 @@ logging.basicConfig(format='%(message)s',
 logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 
 SIZE = 1024  # max packet size as defined by spec
-elementSize = 717  # size of element in bytes TODO ?user determined?
+elementSize = 687  # size of element in bytes TODO ?user determined?
 running = True  # TODO testing, change back
 fileIncomplete = True
 seqPointer = -1  # no packets set yet TODO should be next valid to use
@@ -23,7 +23,6 @@ MAXSEQNUM = 65535
 # key = seq
 # value = (data,ackBool)
 window = {}
-
 
 def removeAndSlideElements(w, s, f, sp, es, ms):
     """ remove appropriate elements from window
@@ -186,40 +185,43 @@ while running:
     ##############################
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind(('0.0.0.0', port))
-    reqData, cAddr = s.recvfrom(SIZE)
+    while True:
+        reqData, cAddr = s.recvfrom(SIZE)
 
-    ##############################
-    # Locate file and get size   #
-    ##############################
-    f = processRequest(reqData)  # defined in ServerTools.py TODO
-    fileSize = os.path.getsize(f)
-    print "Size of files(bytes): " + str(fileSize)
-    f = open(f, 'rb')
-    sizePacket = constructPacket(0, data=fileSize)
-    s.sendto(sizePacket, cAddr)
-    # TODO Loop until file is valid
+        ##############################
+        # Locate file and get size   #
+        ##############################
+        f = processRequest(reqData)  # defined in ServerTools.py TODO
+        if os.path.exists(f):
 
-    # fill window
-    # f =
-    for x in range(0, windowLength):
-        chunk = f.read(elementSize)
-        window[x] = (chunk, False)
-        seqPointer = x
+            fileSize = os.path.getsize(f)
+            print "Size of files(bytes): " + str(fileSize)
+            f = open(f, 'rb')
+            sizePacket = constructPacket(0, data=fileSize)
+            s.sendto(sizePacket, cAddr)
+            # TODO Loop until file is valid
 
-    while fileIncomplete:
+            # fill window
+            # f =
+            for x in range(0, windowLength):
+                chunk = f.read(elementSize)
+                window[x] = (chunk, False)
+                seqPointer = x
 
-        # shoot out entire window if not ack-ed
-        for x in window.keys():
-            if not window[x][1]:
-                print repr(window[x][0])
-                packet, seqNum = constructPacket(1, x, window[x][0])
-                s.sendto(packet, cAddr)
-                # update sequence pointer? TODO
+            while fileIncomplete:
 
-        seqNums = listenForAcks(s)
+                # shoot out entire window if not ack-ed
+                for x in window.keys():
+                    if not window[x][1]:
+                        print repr(window[x][0])
+                        packet, seqNum = constructPacket(1, x, window[x][0])
+                        s.sendto(packet, cAddr)
+                        # update sequence pointer? TODO
 
-        removeAndSlideElements(window, seqNums, f, seqPointer,
-                               elementSize, MAXSEQNUM)
-        # NOTE changed w to Window
+                seqNums = listenForAcks(s)
 
-        # TODO check if file complete
+                removeAndSlideElements(window, seqNums, f, seqPointer,
+                                    elementSize, MAXSEQNUM)
+        else:
+            sizePacket = constructPacket(0, data=0)
+            s.sendto(sizePacket, cAddr)

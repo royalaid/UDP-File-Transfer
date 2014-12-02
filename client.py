@@ -25,21 +25,28 @@ def getUserInput():
 ##########
 # Open File and read first BYTES
 ##########
-filename = getUserInput()
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(('', 1235))
-reqPacket = constructPacket(0, data=filename)
-# Makes new filename so we don't mess up the transferring file
-if os.path.isfile(filename):
-    filename += '_new'
-f = open(filename, "wb")
-s.sendto(reqPacket, ('', 1234))
+while True:
+    filename = getUserInput()
+    reqPacket = constructPacket(0, data=filename)
+    # Makes new filename so we don't mess up the transferring file
+    if os.path.isfile(filename):
+        filename += '_new'
+    f = open(filename, "wb")
+    s.sendto(reqPacket, ('', 1234))
 
-(data, addr) = s.recvfrom(1024)
-recvPacket = json.loads(data)
-if checkHash(recvPacket):
-    print "Size of the file(bytes): " + str(recvPacket[1])
-    fileLength = recvPacket[1]
+    (data, addr) = s.recvfrom(1024)
+    recvPacket = json.loads(data)
+    if checkHash(recvPacket):
+        print "Size of the file(bytes): " + str(recvPacket[1])
+        fileLength = recvPacket[1]
+        if fileLength == 0:
+            print "File doesn't exist."
+        else:
+            print "File found!"
+            break
+
 # start connection
 
 while loop:  # not sure about connected TODO
@@ -47,13 +54,13 @@ while loop:  # not sure about connected TODO
     # configure sequence number
 
     (data, addr) = s.recvfrom(1024)
-    curFileSeg = f.write(BYTES)
-
+    print repr(data)
     # configure checksum
-
+    recvPacket = json.loads(data)
+    print recvPacket
     # To check the hash take the received packet, decode the json, reencode the
     # json based on what is done in the server (extract to tools file?) and then
-    # hash the new json string and check against the parsed hash/truncated hash
+    # hash the new j;son string and check against the parsed hash/truncated hash
 
     # determine if sending
 
