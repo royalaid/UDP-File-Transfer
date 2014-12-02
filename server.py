@@ -36,6 +36,7 @@ def removeAndSlideElements(w, s, f, sp, es, ms):
         sp: sequence pointer, es: element size, ms: max sequence number
     """
     print "inside remove and slide"
+
     wkeys = w.keys()
     print "wkeys : " + str(repr(wkeys))
     delCount = 0
@@ -136,11 +137,16 @@ def listenForAcks(s):
     seqNums = []
     start_time = time.time()
     while (time.time() - start_time) < timeout:  # wait timeout sec
-        packet,caddr = s.recvfrom(SIZE)
-        packet = json.loads(packet)  # convert bytearray to python object
-        processAck(packet, seqNums)  # append seq nums to list seqNums
+        print "this should be the last line"
+        try:
+            packet,caddr = s.recvfrom(SIZE)
+            packet = json.loads(packet)  # convert bytearray to python object
+            processAck(packet, seqNums)  # append seq nums to list seqNums
+            print "inside the while loop"
+        except:
+            pass
 
-    return seqNums
+        return seqNums
 
 
 
@@ -205,6 +211,8 @@ while True:
     ##############################
     # Locate file and get size   #
     ##############################
+
+    s.settimeout(.01)
     f = processRequest(reqData)  # defined in ServerTools.py
     if os.path.exists(f):  # check if the file exists
         print "File requested " + str(f)
@@ -228,15 +236,11 @@ while True:
 
             while fileIncomplete:
 
-                # Check for completion of file transfer
-                pid = os.fork()
                 # shoot out entire window if not ack-ed
-                if (pid == 0):
-                    for x in window.keys():
-                        if not window[x][1]:
-                            packet, seqNum = constructPacket(1, x, window[x][0])
-                            s.sendto(packet, cAddr)
-                    sys.exit()
+                for x in window.keys():
+                    if not window[x][1]:
+                        packet, seqNum = constructPacket(1, x, window[x][0])
+                        s.sendto(packet, cAddr)
 
                 seqNums = listenForAcks(s)
                 print "seqNums = "
