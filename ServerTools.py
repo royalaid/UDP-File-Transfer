@@ -2,7 +2,7 @@ import json
 import base64
 import hashlib
 
-MAXSEQNUM = 65535
+MAXSEQNUM = 99999
 # When base64 encoded this is the max size we can fit into the packet
 MAXPACKLEN = 687
 
@@ -49,7 +49,6 @@ def constructPacket(opcode, curSeq=0, data=""):
     :returns: A tuple with (json string that is the packet, last used seqNum)
     """
 
-    curSeq += 1
     if curSeq > MAXSEQNUM:
         curSeq = 0
 

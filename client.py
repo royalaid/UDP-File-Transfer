@@ -48,7 +48,7 @@ while True:
             break
 
 # start connection
-startSeq = 0
+curSeq = 1
 ackPacketsDict = {}
 with open(filename, "wb") as f:
     while loop:  # not sure about connected TODO
@@ -61,6 +61,10 @@ with open(filename, "wb") as f:
         recvPacket = json.loads(data)
         if checkHash(recvPacket):
             ackPacketsDict[recvPacket[2]] = base64.decodestring(recvPacket[1])
+            if(recvPacket[2] == curSeq):
+                print ackPacketsDict[curSeq]
+                f.write(ackPacketsDict[curSeq])
+                curSeq += 1
             s.sendto(constructPacket(2, data=recvPacket[2]), addr)
             print constructPacket(2, data=recvPacket[2])
     # To check the hash take the received packet, decode the json, reencode the
