@@ -1,35 +1,53 @@
 import sys
 import os
 import logging
-
+import socket
+import base64
+import json
+import hashlib
+from ServerTools import constructPacket
+from ServerTools import checkHash
 # clear logging TODO
 logging.basicConfig(format='%(message)s',
                     filename='log.log',
                     level=logging.DEBUG)
 logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 
-#### Constants
+# Constants
 BYTES = 4
 loop = True
-
+fileLength = 0
 def getUserInput():
-    filename = raw_input("Please specify a file: \n")
+    filename = raw_input("Please specify a file: \n").rstrip()
     return filename
 
 
 ##########
 # Open File and read first BYTES
 ##########
+filename = getUserInput()
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind(('', 1235))
+reqPacket = constructPacket(0, data=filename)
+# Makes new filename so we don't mess up the transferring file
+if os.path.isfile(filename):
+    filename += '_new'
+f = open(filename, "wb")
+s.sendto(reqPacket, ('', 1234))
 
-f = open(getUserInput(),"r")
-
+(data, addr) = s.recvfrom(1024)
+recvPacket = json.loads(data)
+if checkHash(recvPacket):
+    print "Size of the file(bytes): " + str(recvPacket[1])
+    fileLength = recvPacket[1]
 # start connection
 
-while loop and connected:  #not sure about connected TODO
+while loop:  # not sure about connected TODO
     # configure sender ip
     # configure sequence number
 
-    curFileSeg = f.read(BYTES)
+    (data, addr) = s.recvfrom(1024)
+    curFileSeg = f.write(BYTES)
 
     # configure checksum
 

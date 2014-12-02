@@ -4,6 +4,9 @@ import logging
 import time
 import json
 import hashlib
+import os
+from ServerTools import constructPacket
+from ServerTools import checkHash
 # clear logging TODO
 logging.basicConfig(format='%(message)s',
                     filename='log.log',
@@ -11,8 +14,8 @@ logging.basicConfig(format='%(message)s',
 logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 
 SIZE = 1024  # max packet size as defined by spec
-elementSize = 1  # size of element in bytes TODO ?user determined?
-running = False  # TODO testing, change back
+elementSize = 717  # size of element in bytes TODO ?user determined?
+running = True  # TODO testing, change back
 fileIncomplete = True
 seqPointer = -1  # no packets set yet TODO should be next valid to use
 seqNum = 0
@@ -22,35 +25,14 @@ MAXSEQNUM = 65535
 window = {}
 
 
-def constructPacket(opcode, curSeq, data=""):
-    """TODO: Docstring for constructPacket.
-
-    :opcode: OpCodes are as follows, Request = 0, Data = 1, Ack = 2,
-    Retransmit packet = 3, Timeout-Error = 4
-    :data: The data to be transmitted
-    :returns: A json string representing the packet to be sent
-    """
-    if opcode != 1:
-        packetData = ""
-    else:
-        packetData = data
-
-    curSeq += 1
-    if curSeq > MAXSEQNUM:
-        curSeq = 0
-    # Remeber to make any changes to both the hashPacket and return val encodes
-    hashPacket = json.dumps([opcode, packetData, curSeq], separators=(',', ':'))
-    # For info about this see here http://bit.ly/1vA3gms
-    hashSig = hashlib.sha1(hashPacket.encode("UTF-8")).hexdigest()
-    return json.dumps([opcode, packetData, curSeq, hashSig],
-                      separators=(',', ':'))
-
-
 def removeAndSlideElements(w, s, f, sp, es, ms):
     """ remove appropriate elements from window
         and set ack-ed element
         appropriate = consecutive lowest seq
         also slides window by adding bytes from file
+
+        w: Window (Dictionary), s: Sequence Numbers (list), f: File,
+        sp: sequence pointer, es: element size, ms: max sequence number
     """
     wkeys = w.keys()
     delCount = 0
@@ -140,6 +122,8 @@ def listenForAcks(s):
     return seqNums
 
 
+
+
 def processAck(packet, seqNums):
     """Verify checksum
     pull out sequence num
@@ -150,25 +134,24 @@ def processAck(packet, seqNums):
 def processRequest(data):
     """Handles request packet, verify checksum, get desired file info from
     file in working directory
+
+    [opcode, data, seq, hash]
     """
-    # TODO
-    pass
+    reqData = json.loads(data)
+    reqData[1] = reqData[1].encode("UTF-8")
+    hashCheck = reqData[2]
+    jsonPacket = json.dumps(reqData[:2], separators=(',', ':'))
+    hashGen = hashlib.sha1(jsonPacket.encode("UTF-8")).hexdigest()
+    if hashCheck != hashGen:
+        print "Hash error"
+    else:
+        try:
+            return reqData[1]
+        except:
+            return None
 
-
-def locateFile(fileName):
-    """
-    """
-
-
-def function(arg1):
-    """TODO: Docstring for function.
-
-    :arg1: TODO
-    :returns: TODO
-
-    """
-    pass
 while running:
+    '''
     ##########
     # user input
     ##########
@@ -182,7 +165,7 @@ while running:
     try:
         port = int(port)
         if port < 1024:
-            raise Exception("Check your previllage (and your port)")
+            raise Exception("Check your privilege (and your port)")
     except:
         print "\nIncorrect Format, please use an integer above '1024'"
 
@@ -194,6 +177,10 @@ while running:
     except:
         print "\nIncorrect Format, please use an integer between 5-10 inclusive"
 
+    '''
+    port = 1234
+    timeout = 100
+    windowLength = 6
     ##############################
     # Listen for initial request #
     ##############################
@@ -201,12 +188,19 @@ while running:
     s.bind(('0.0.0.0', port))
     reqData, cAddr = s.recvfrom(SIZE)
 
-    nameFile = processRequest(reqData)  # defined in ServerTools.py TODO
-    pathFile = locateFile(nameFile)
+    ##############################
+    # Locate file and get size   #
+    ##############################
+    f = processRequest(reqData)  # defined in ServerTools.py TODO
+    fileSize = os.path.getsize(f)
+    print "Size of files(bytes): " + str(fileSize)
+    f = open(f, 'rb')
+    sizePacket = constructPacket(0, data=fileSize)
+    s.sendto(sizePacket, cAddr)
+    # TODO Loop until file is valid
 
-    # create file object
     # fill window
-    f = (pathFile, 'r')
+    # f =
     for x in range(0, windowLength):
         chunk = f.read(elementSize)
         window[x] = (chunk, False)
@@ -216,9 +210,10 @@ while running:
 
         # shoot out entire window if not ack-ed
         for x in window.keys():
-            if not window[x][2]:
-                packet = constructPacket(window[x], x)
-                s.sendto(packet, (cAddr, port))
+            if not window[x][1]:
+                print repr(window[x][0])
+                packet, seqNum = constructPacket(1, x, window[x][0])
+                s.sendto(packet, cAddr)
                 # update sequence pointer? TODO
 
         seqNums = listenForAcks(s)
