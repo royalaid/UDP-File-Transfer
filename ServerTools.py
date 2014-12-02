@@ -30,8 +30,6 @@ def checkHash(packet):
 
     jsonPacket = json.dumps(packet[:i], separators=(',', ':'))
     hashGen = hashlib.sha1(jsonPacket.encode("UTF-8")).hexdigest()  # new hash
-    print "actual hash: " + str(hashGen)
-    print "received hash: " + str(hashCheck)
     if (hashGen == hashCheck):  # compare received and actual
         print "Hash confirmed"
         return True
