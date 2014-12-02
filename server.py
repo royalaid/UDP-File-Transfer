@@ -17,9 +17,9 @@ SIZE = 1024  # max packet size as defined by spec
 elementSize = 687  # size of element in bytes TODO ?user determined?
 running = True  # TODO testing, change back
 fileIncomplete = True
-seqPointer = -1  # no packets set yet TODO should be next valid to use
+seqPointer = 0  # no packets set yet TODO should be next valid to use
 seqNum = 0
-MAXSEQNUM = 65535
+MAXSEQNUM = 99999
 # key = seq
 # value = (data,ackBool)
 window = {}
@@ -39,8 +39,8 @@ def removeAndSlideElements(w, s, f, sp, es, ms):
     if dangerzone(w):
         properSort(wkeys, s)
     else:
-        wkeys = wkeys.sort()
-        s = s.sort()
+        wkeys.sort()
+        s.sort()
 
     setAcks(w, wkeys, s)
 
@@ -101,7 +101,8 @@ def properSort(wkeys, s):
 
 
 def dangerzone(window):
-    w = window.keys().sort()
+    w = window.keys()
+    w.sort()
     if w[0] - w[len(w)-1] > len(w):
         return True
     else:
@@ -194,18 +195,21 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(('0.0.0.0', port))
 while True:
     reqData, cAddr = s.recvfrom(SIZE)
-
+    print "request recieved"
+    print "client ip: " + str(cAddr)
     ##############################
     # Locate file and get size   #
     ##############################
     f = processRequest(reqData)  # defined in ServerTools.py
     if os.path.exists(f):  # check if the file exists
-
+        print "File requested " + str(f)
         fileSize = os.path.getsize(f)
         print "Size of files(bytes): " + str(fileSize)
+
         with open(f,'rb') as f:
             sizePacket = constructPacket(0, data=fileSize)
             s.sendto(sizePacket, cAddr)
+            print "sent packet size"
             # TODO Loop until file is valid
 
             # fill window
@@ -216,17 +220,21 @@ while True:
 
             while fileIncomplete:
 
+                # Check for completion of file transfer
+
                 # shoot out entire window if not ack-ed
                 for x in window.keys():
                     if not window[x][1]:
                         packet, seqNum = constructPacket(1, x, window[x][0])
                         s.sendto(packet, cAddr)
-                        # update sequence pointer? TODO
 
                 seqNums = listenForAcks(s)
 
                 removeAndSlideElements(window, seqNums, f, seqPointer,
-                                    elementSize, MAXSEQNUM)
+                                elementSize, MAXSEQNUM)
+
+
     else:
         sizePacket = constructPacket(0, data=0)
         s.sendto(sizePacket, cAddr)
+        print "invalid file name"
