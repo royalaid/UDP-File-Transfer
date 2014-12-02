@@ -113,21 +113,28 @@ def listenForAcks(s):
     processes those acks
     stores acknowledged seq numbers and returns
     """
+
+    def processAck(packet, seqNums):
+        """Verify checksum
+        pull out sequence num
+        append seq num to seqNums
+        """
+        print "ack packet received"
+        if checkHash(packet):
+            seqNums.append(packet[1])
+            print packet[1]  # id confirmed packet
+
     seqNums = []
     start_time = time.time()
     while (time.time() - start_time) < timeout:  # wait timeout sec
-        packet = s.recvfrom(SIZE)
+        packet,caddr = s.recvfrom(SIZE)
+        packet = json.loads(packet)  # convert bytearray to python object
         processAck(packet, seqNums)  # append seq nums to list seqNums
+
     return seqNums
 
 
 
-
-def processAck(packet, seqNums):
-    """Verify checksum
-    pull out sequence num
-    append seq num to seqNums
-    """
 
 
 def processRequest(data):
@@ -149,60 +156,59 @@ def processRequest(data):
         except:
             return None
 
-while running:
-    '''
-    ##########
-    # user input
-    ##########
-    timeout = raw_input("\nPlease specify a timeout duration in seconds.")
-    try:
-        timeout = float(timeout)
-    except:
-        print "\nIncorrect Format for timeout."
+'''
+##########
+# user input
+##########
+timeout = raw_input("\nPlease specify a timeout duration in seconds.")
+try:
+    timeout = float(timeout)
+except:
+    print "\nIncorrect Format for timeout."
 
-    port = raw_input("\nPlease specify a port number.")
-    try:
-        port = int(port)
-        if port < 1024:
-            raise Exception("Check your privilege (and your port)")
-    except:
-        print "\nIncorrect Format, please use an integer above '1024'"
+port = raw_input("\nPlease specify a port number.")
+try:
+    port = int(port)
+    if port < 1024:
+        raise Exception("Check your privilege (and your port)")
+except:
+    print "\nIncorrect Format, please use an integer above '1024'"
 
-    windowLength = raw_input("\nPlease specify a window length.")
-    try:
-        windowLength = int(windowLength)
-        if windowLength > 10 or windowLength < 5:
-            raise Exception("Wrong Window Size")
-    except:
-        print "\nIncorrect Format, please use an integer between 5-10 inclusive"
+windowLength = raw_input("\nPlease specify a window length.")
+try:
+    windowLength = int(windowLength)
+    if windowLength > 10 or windowLength < 5:
+        raise Exception("Wrong Window Size")
+except:
+    print "\nIncorrect Format, please use an integer between 5-10 inclusive"
 
-    '''
-    port = 1234
-    timeout = 100
-    windowLength = 6
+'''
+print "server running..."
+port = 1234
+timeout = 100
+windowLength = 6
+##############################
+# Listen for initial request #
+##############################
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind(('0.0.0.0', port))
+while True:
+    reqData, cAddr = s.recvfrom(SIZE)
+
     ##############################
-    # Listen for initial request #
+    # Locate file and get size   #
     ##############################
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.bind(('0.0.0.0', port))
-    while True:
-        reqData, cAddr = s.recvfrom(SIZE)
+    f = processRequest(reqData)  # defined in ServerTools.py
+    if os.path.exists(f):  # check if the file exists
 
-        ##############################
-        # Locate file and get size   #
-        ##############################
-        f = processRequest(reqData)  # defined in ServerTools.py TODO
-        if os.path.exists(f):
-
-            fileSize = os.path.getsize(f)
-            print "Size of files(bytes): " + str(fileSize)
-            f = open(f, 'rb')
+        fileSize = os.path.getsize(f)
+        print "Size of files(bytes): " + str(fileSize)
+        with open(f,'rb') as f:
             sizePacket = constructPacket(0, data=fileSize)
             s.sendto(sizePacket, cAddr)
             # TODO Loop until file is valid
 
             # fill window
-            # f =
             for x in range(0, windowLength):
                 chunk = f.read(elementSize)
                 window[x] = (chunk, False)
@@ -213,7 +219,6 @@ while running:
                 # shoot out entire window if not ack-ed
                 for x in window.keys():
                     if not window[x][1]:
-                        print repr(window[x][0])
                         packet, seqNum = constructPacket(1, x, window[x][0])
                         s.sendto(packet, cAddr)
                         # update sequence pointer? TODO
@@ -222,6 +227,6 @@ while running:
 
                 removeAndSlideElements(window, seqNums, f, seqPointer,
                                     elementSize, MAXSEQNUM)
-        else:
-            sizePacket = constructPacket(0, data=0)
-            s.sendto(sizePacket, cAddr)
+    else:
+        sizePacket = constructPacket(0, data=0)
+        s.sendto(sizePacket, cAddr)
