@@ -33,7 +33,7 @@ while True:
     # Makes new filename so we don't mess up the transferring file
     if os.path.isfile(filename):
         filename += '_new'
-    f = open(filename, "wb")
+
     s.sendto(reqPacket, ('148.61.112.111', 1234))
 
     (data, addr) = s.recvfrom(1024)
@@ -48,16 +48,21 @@ while True:
             break
 
 # start connection
+startSeq = 0
+ackPacketsDict = {}
+with open(filename, "wb") as f:
+    while loop:  # not sure about connected TODO
+        # configure sender ip
+        # configure sequence number
 
-while loop:  # not sure about connected TODO
-    # configure sender ip
-    # configure sequence number
-
-    (data, addr) = s.recvfrom(1024)
-    print repr(data)
-    # configure checksum
-    recvPacket = json.loads(data)
-    print recvPacket
+        (data, addr) = s.recvfrom(1024)
+        print repr(data)
+        # configure checksum
+        recvPacket = json.loads(data)
+        if checkHash(recvPacket):
+            ackPacketsDict[recvPacket[2]] = base64.decodestring(recvPacket[1])
+            s.sendto(constructPacket(2, data=recvPacket[2]), addr)
+            print constructPacket(2, data=recvPacket[2])
     # To check the hash take the received packet, decode the json, reencode the
     # json based on what is done in the server (extract to tools file?) and then
     # hash the new j;son string and check against the parsed hash/truncated hash
@@ -65,10 +70,10 @@ while loop:  # not sure about connected TODO
     # determine if sending
 
 
-# at some point for with :
+    # at some point for with :
 
-# pid = os.fork()
+    # pid = os.fork()
 
-# if not pid :  #child???
+    # if not pid :  #child???
 
-# else: # parent???
+    # else: # parent???
