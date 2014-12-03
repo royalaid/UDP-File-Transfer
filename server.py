@@ -24,50 +24,78 @@ MAXSEQNUM = 99999
 # value = (data,ackBool)
 window = {}
 
-def removeAndSlideElements(w, s, f, sp, es, ms):
-    """ remove appropriate elements from window
-        and set ack-ed element
-        appropriate = consecutive lowest seq
-        also slides window by adding bytes from file
 
-        w: Window (Dictionary), s: Sequence Numbers (list), f: File,
-        sp: sequence pointer, es: element size, ms: max sequence number
+def removeAndSlideElements(w, confirmedAcks, f, sp, es, ms):
+    """ remove appropriate elements from window
+    and set ack-ed element
+    appropriate = consecutive lowest seq
+    also slides window by adding bytes from file
+    w: Window (Dictionary), confirmedAcks: confirmed Sequence Numbers (list),
+    f: File, sp: sequence pointer, es: element size, ms: max sequence number
     """
     wkeys = w.keys()
     delCount = 0
 
     if dangerzone(w):
-        properSort(wkeys, s)
+        properSort(wkeys, confirmedAcks) #TODO make proper sort return
     else:
         wkeys.sort()
-        s.sort()
+        confirmedAcks.sort()
 
-    setAcks(w, wkeys, s)
-
+    lowestWindowKey = wkeys[0]
+    bottomShift = 0
+    print "Wkeys before setAcks:"
+    print str(wkeys)
+    print "seqNumArr before setAcks:"
+    print str(confirmedAcks) + '\n'
+    w = setAcks(w, wkeys, confirmedAcks)
+    print "Wkeys after setAcks:"
+    print str(wkeys)
+    print "seqNumArr after setAcks:"
+    print str(confirmedAcks) + '\n'
     # removing elements
-    if wkeys[0] == s[0]:  # we can remove elements
-        for i in range(1, len(s)):
-            if s[i] - s[i-1] == 1 and i != 0:  # contigous from first get del
+    for x in confirmedAcks:
+        packetConfirmed = w[x][2]
+        if packetConfirmed:
+            if x == (lowestWindowKey + bottomShift):
+                # We have removed the bottom, time to shift our lower window
+                del w[x]
+                bottomShift += 1
+                if bottomShift > MAXSEQNUM:
+                    pass
+                    #TODO deal with this corner case
+        else:
+            break
+
+    """
+    if wkeys[0] == confirmedAcks[0]:  # Lowest elemet is confirmed so we can move
+        print "Window: " + str(w)
+        for i in confirmedAcks:
+
+        if confirmedAcks[i] - confirmedAcks[i-1] == 1:  # contigous from first get del
                 del w[wkeys[i-1]]
                 delCount += 1
-        del w[wkeys[0]]
-        delCount += 1
-
+                del w[wkeys[0]]
+                delCount += 1 """
+    # print "delCount after 'Remove': " + str(delCount)
     # sliding window
-    for i in range(0, delCount):
+    for i in range(0, bottomShift):
         chunk = f.read(es)
         w[sp] = (chunk, False)
+        print "Adding chuck " + str(sp)
         sp = (sp + 1) % ms
 
 
-def setAcks(w, wkeys, s):
+
+def setAcks(w, wkeys, seqNumArr):
     """Sets all ackbools of window elements to true for
     sequence numbers that we have gotten acks for
     """
 
-    for x in s:
+    for x in seqNumArr:
         if x in wkeys:
-            w[x][1] = True
+            w[x] = (w[x][0], True)
+    return w
 
 
 def properSort(wkeys, s):
@@ -109,33 +137,31 @@ def dangerzone(window):
         return False
 
 
-def listenForAcks(s):
+def listenForAcks(s, keysToConfirm):
     """ listens on socket s for packets
     processes those acks
     stores acknowledged seq numbers and returns
     """
 
-    def processAck(packet, seqNums):
-        """Verify checksum
-        pull out sequence num
-        append seq num to seqNums
-        """
-        print "ack packet received"
-        if checkHash(packet):
-            seqNums.append(packet[1])
-            print packet[1]  # id confirmed packet
-
-    seqNums = []
+    confirmedAcks = []
     start_time = time.time()
+    print "Start Time: " + str(start_time)
+    s.settimeout(None)
     while (time.time() - start_time) < timeout:  # wait timeout sec
-        packet,caddr = s.recvfrom(SIZE)
-        packet = json.loads(packet)  # convert bytearray to python object
-        processAck(packet, seqNums)  # append seq nums to list seqNums
-
-    return seqNums
-
-
-
+        try:
+            print "About to recv"
+            packet, caddr = s.recvfrom(SIZE)
+            packet = json.loads(packet)
+            print "listenForAcks is grabbing " + str(packet[1])
+            if(checkHash(packet)):
+                confirmedAcks.append(packet[1])
+            keysToConfirm.remove(packet[1])
+            if(len(keysToConfirm) == 0):
+                break
+        except Exception, e:
+            print "SocketTimeout?"
+            print e
+    return confirmedAcks
 
 
 def processRequest(data):
@@ -156,6 +182,7 @@ def processRequest(data):
             return reqData[1]
         except:
             return None
+
 
 '''
 ##########
@@ -185,7 +212,7 @@ except:
 
 '''
 print "server running..."
-port = 1234
+port = 1236
 timeout = 100
 windowLength = 6
 ##############################
@@ -206,12 +233,11 @@ while True:
         fileSize = os.path.getsize(f)
         print "Size of files(bytes): " + str(fileSize)
 
-        with open(f,'rb') as f:
+        with open(f, 'rb') as f:
             sizePacket = constructPacket(0, data=fileSize)
             s.sendto(sizePacket, cAddr)
             print "sent packet size"
             # TODO Loop until file is valid
-
             # fill window
             for x in range(0, windowLength):
                 chunk = f.read(elementSize)
@@ -227,12 +253,12 @@ while True:
                     if not window[x][1]:
                         packet, seqNum = constructPacket(1, x, window[x][0])
                         s.sendto(packet, cAddr)
-
-                seqNums = listenForAcks(s)
-
-                removeAndSlideElements(window, seqNums, f, seqPointer,
-                                elementSize, MAXSEQNUM)
-
+                print "Listening for Acks"
+                ackedSeqNums = listenForAcks(s, window.keys())
+                window, seqPointer = removeAndSlideElements(window, ackedSeqNums,
+                                                           f, seqPointer,
+                                                           elementSize,
+                                                           MAXSEQNUM)
 
     else:
         sizePacket = constructPacket(0, data=0)

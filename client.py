@@ -17,9 +17,14 @@ logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 BYTES = 4
 loop = True
 fileLength = 0
+
+
 def getUserInput():
-    filename = raw_input("Please specify a file: \n").rstrip()
-    return filename
+    try:
+        fileName = sys.argv[1]
+    except Exception:
+        fileName = raw_input("Please specify a file: \n").rstrip()
+    return fileName
 
 
 ##########
@@ -32,9 +37,11 @@ while True:
     reqPacket = constructPacket(0, data=filename)
     # Makes new filename so we don't mess up the transferring file
     if os.path.isfile(filename):
-        filename += '_new'
+        mode = 'r+b'
+    else:
+        mode = 'wb'
 
-    s.sendto(reqPacket, ('148.61.112.111', 1234))
+    s.sendto(reqPacket, ('148.61.112.111', 1236))
 
     (data, addr) = s.recvfrom(1024)
     recvPacket = json.loads(data)
@@ -48,9 +55,10 @@ while True:
             break
 
 # start connection
-curSeq = 1
+curSeq = 0
 ackPacketsDict = {}
-with open(filename, "wb") as f:
+totalByteRecv = 0
+with open(filename, mode) as f:
     while loop:  # not sure about connected TODO
         # configure sender ip
         # configure sequence number
@@ -62,7 +70,9 @@ with open(filename, "wb") as f:
         if checkHash(recvPacket):
             ackPacketsDict[recvPacket[2]] = base64.decodestring(recvPacket[1])
             if(recvPacket[2] == curSeq):
-                print ackPacketsDict[curSeq]
+                print repr(ackPacketsDict[curSeq])
+                totalByteRecv += len(ackPacketsDict[curSeq])
+                print "The Bytes So far: " + str(totalByteRecv)
                 f.write(ackPacketsDict[curSeq])
                 curSeq += 1
             s.sendto(constructPacket(2, data=recvPacket[2]), addr)
@@ -72,7 +82,6 @@ with open(filename, "wb") as f:
     # hash the new j;son string and check against the parsed hash/truncated hash
 
     # determine if sending
-
 
     # at some point for with :
 
