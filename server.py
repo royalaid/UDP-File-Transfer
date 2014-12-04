@@ -43,48 +43,54 @@ def removeAndSlideElements(w, confirmedAcks, f, sp, es, ms):
         confirmedAcks.sort()
 
     lowestWindowKey = wkeys[0]
-    bottomShift = 0
-    print "Wkeys before setAcks:"
-    print str(wkeys)
-    print "seqNumArr before setAcks:"
-    print str(confirmedAcks) + '\n'
+    lowerBoundWindow = lowestWindowKey
+    removedElms = 0
+    #print "Wkeys before setAcks:"
+    #print str(wkeys)
+    #print "seqNumArr before setAcks:"
+    #print str(confirmedAcks) + '\n'
     w = setAcks(w, wkeys, confirmedAcks)
-    print "Wkeys after setAcks:"
-    print str(wkeys)
-    print "seqNumArr after setAcks:"
-    print str(confirmedAcks) + '\n'
+    #print "Wkeys after setAcks:"
+    #print str(wkeys)
+    #print "seqNumArr after setAcks:"
+    #print str(confirmedAcks) + '\n'
     # removing elements
     for x in confirmedAcks:
-        packetConfirmed = w[x][2]
+        packetConfirmed = w[x][1]
         if packetConfirmed:
-            if x == (lowestWindowKey + bottomShift):
+            #print "Current X: " + str(x)
+            if x == (lowestWindowKey):
                 # We have removed the bottom, time to shift our lower window
                 del w[x]
-                bottomShift += 1
-                if bottomShift > MAXSEQNUM:
-                    pass
-                    #TODO deal with this corner case
+                wkeys.remove(x)
+                #print "Removed " + str(x) + " from w and wkeys"
+                #print wkeys
+                removedElms += 1
+                #print "RemovedElms = " + str(removedElms)
+                if(len(wkeys) > 0):
+                    lowestWindowKey = wkeys[0]
+                    lowerBoundWindow = lowestWindowKey
+                    if wkeys[0] > MAXSEQNUM:
+                        pass
+                        #TODO deal with this corner case
+                else:
+                    lowerBoundWindow = (lowestWindowKey + 1) % MAXSEQNUM
         else:
             break
 
-    """
-    if wkeys[0] == confirmedAcks[0]:  # Lowest elemet is confirmed so we can move
-        print "Window: " + str(w)
-        for i in confirmedAcks:
-
-        if confirmedAcks[i] - confirmedAcks[i-1] == 1:  # contigous from first get del
-                del w[wkeys[i-1]]
-                delCount += 1
-                del w[wkeys[0]]
-                delCount += 1 """
-    # print "delCount after 'Remove': " + str(delCount)
+    ackNeededElm = lowerBoundWindow
+    topOfWindow = ackNeededElm + removedElms
     # sliding window
-    for i in range(0, bottomShift):
+    for i in range(0, removedElms):
+        posOfNeededChunk = es * sp
+        f.seek(posOfNeededChunk)
         chunk = f.read(es)
         w[sp] = (chunk, False)
-        print "Adding chuck " + str(sp)
-        sp = (sp + 1) % ms
-
+        #print "Adding chuck " + str(sp)
+        sp = (sp + 1) % ms #TODO handle wrap around
+        #print "Len of window: " + str(len(w))
+    #raw_input("Continue?")
+    return (w, sp)
 
 
 def setAcks(w, wkeys, seqNumArr):
@@ -145,22 +151,23 @@ def listenForAcks(s, keysToConfirm):
 
     confirmedAcks = []
     start_time = time.time()
-    print "Start Time: " + str(start_time)
+    #print "Start Time: " + str(start_time)
     s.settimeout(None)
     while (time.time() - start_time) < timeout:  # wait timeout sec
         try:
-            print "About to recv"
+            #print "About to recv"
             packet, caddr = s.recvfrom(SIZE)
             packet = json.loads(packet)
-            print "listenForAcks is grabbing " + str(packet[1])
+            #print "listenForAcks is grabbing " + str(packet[1])
             if(checkHash(packet)):
                 confirmedAcks.append(packet[1])
             keysToConfirm.remove(packet[1])
             if(len(keysToConfirm) == 0):
                 break
         except Exception, e:
-            print "SocketTimeout?"
-            print e
+            pass
+            #print "SocketTimeout?"
+            #print e
     return confirmedAcks
 
 
@@ -176,7 +183,8 @@ def processRequest(data):
     jsonPacket = json.dumps(reqData[:2], separators=(',', ':'))
     hashGen = hashlib.sha1(jsonPacket.encode("UTF-8")).hexdigest()
     if hashCheck != hashGen:
-        print "Hash error"
+        pass
+        #print "Hash error"
     else:
         try:
             return reqData[1]
@@ -214,7 +222,7 @@ except:
 print "server running..."
 port = 1236
 timeout = 100
-windowLength = 6
+windowLength = 4
 ##############################
 # Listen for initial request #
 ##############################
@@ -222,21 +230,21 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(('0.0.0.0', port))
 while True:
     reqData, cAddr = s.recvfrom(SIZE)
-    print "request recieved"
-    print "client ip: " + str(cAddr)
+    #print "request recieved"
+    #print "client ip: " + str(cAddr)
     ##############################
     # Locate file and get size   #
     ##############################
     f = processRequest(reqData)  # defined in ServerTools.py
     if os.path.exists(f):  # check if the file exists
-        print "File requested " + str(f)
+        #print "File requested " + str(f)
         fileSize = os.path.getsize(f)
         print "Size of files(bytes): " + str(fileSize)
 
         with open(f, 'rb') as f:
             sizePacket = constructPacket(0, data=fileSize)
             s.sendto(sizePacket, cAddr)
-            print "sent packet size"
+            #print "sent packet size"
             # TODO Loop until file is valid
             # fill window
             for x in range(0, windowLength):
@@ -252,8 +260,9 @@ while True:
                 for x in window.keys():
                     if not window[x][1]:
                         packet, seqNum = constructPacket(1, x, window[x][0])
+                        print "Sent " + str(x * elementSize) + " bytes"
                         s.sendto(packet, cAddr)
-                print "Listening for Acks"
+                #print "Listening for Acks"
                 ackedSeqNums = listenForAcks(s, window.keys())
                 window, seqPointer = removeAndSlideElements(window, ackedSeqNums,
                                                            f, seqPointer,
@@ -263,4 +272,4 @@ while True:
     else:
         sizePacket = constructPacket(0, data=0)
         s.sendto(sizePacket, cAddr)
-        print "invalid file name"
+        #print "invalid file name"

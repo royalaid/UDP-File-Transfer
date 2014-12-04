@@ -37,9 +37,8 @@ while True:
     reqPacket = constructPacket(0, data=filename)
     # Makes new filename so we don't mess up the transferring file
     if os.path.isfile(filename):
-        mode = 'r+b'
-    else:
-        mode = 'wb'
+        filename += 'New'
+    mode = 'wb'
 
     s.sendto(reqPacket, ('148.61.112.111', 1236))
 
@@ -64,15 +63,16 @@ with open(filename, mode) as f:
         # configure sequence number
 
         (data, addr) = s.recvfrom(1024)
-        print repr(data)
+        #print repr(data)
         # configure checksum
         recvPacket = json.loads(data)
         if checkHash(recvPacket):
             ackPacketsDict[recvPacket[2]] = base64.decodestring(recvPacket[1])
             if(recvPacket[2] == curSeq):
-                print repr(ackPacketsDict[curSeq])
+                #print repr(ackPacketsDict[curSeq])
                 totalByteRecv += len(ackPacketsDict[curSeq])
                 print "The Bytes So far: " + str(totalByteRecv)
+                print "curSeq is " + str(curSeq)
                 f.write(ackPacketsDict[curSeq])
                 curSeq += 1
             s.sendto(constructPacket(2, data=recvPacket[2]), addr)
