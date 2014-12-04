@@ -16,13 +16,10 @@ logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 SIZE = 1024  # max packet size as defined by spec
 elementSize = 687  # size of element in bytes TODO ?user determined?
 running = True  # TODO testing, change back
-fileIncomplete = True
-seqPointer = 0  # no packets set yet TODO should be next valid to use
-seqNum = 0
 MAXSEQNUM = 99999
+fileSize = 0
 # key = seq
 # value = (data,ackBool)
-window = {}
 
 
 def removeAndSlideElements(w, confirmedAcks, f, sp, es, ms):
@@ -63,8 +60,8 @@ def removeAndSlideElements(w, confirmedAcks, f, sp, es, ms):
                 # We have removed the bottom, time to shift our lower window
                 del w[x]
                 wkeys.remove(x)
-                #print "Removed " + str(x) + " from w and wkeys"
-                #print wkeys
+                print "Removed " + str(x) + " from w and wkeys"
+                print wkeys
                 removedElms += 1
                 #print "RemovedElms = " + str(removedElms)
                 if(len(wkeys) > 0):
@@ -82,12 +79,15 @@ def removeAndSlideElements(w, confirmedAcks, f, sp, es, ms):
     topOfWindow = ackNeededElm + removedElms
     # sliding window
     for i in range(0, removedElms):
+        sp = (sp + 1) % ms #TODO handle wrap around
         posOfNeededChunk = es * sp
+        if(posOfNeededChunk >= fileSize):
+           print "Read through end of file"
+           return (w, sp)
         f.seek(posOfNeededChunk)
         chunk = f.read(es)
         w[sp] = (chunk, False)
-        #print "Adding chuck " + str(sp)
-        sp = (sp + 1) % ms #TODO handle wrap around
+        print "Adding chuck " + str(sp)
         #print "Len of window: " + str(len(w))
     #raw_input("Continue?")
     return (w, sp)
@@ -158,7 +158,7 @@ def listenForAcks(s, keysToConfirm):
             #print "About to recv"
             packet, caddr = s.recvfrom(SIZE)
             packet = json.loads(packet)
-            #print "listenForAcks is grabbing " + str(packet[1])
+            print "Ack for " + str(packet[1])
             if(checkHash(packet)):
                 confirmedAcks.append(packet[1])
             keysToConfirm.remove(packet[1])
@@ -221,7 +221,7 @@ except:
 '''
 print "server running..."
 port = 1236
-timeout = 100
+timeout = 1
 windowLength = 4
 ##############################
 # Listen for initial request #
@@ -229,6 +229,10 @@ windowLength = 4
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(('0.0.0.0', port))
 while True:
+    fileIncomplete = True
+    seqPointer = 0  # no packets set yet TODO should be next valid to use
+    seqNum = 0
+    window = {}
     reqData, cAddr = s.recvfrom(SIZE)
     #print "request recieved"
     #print "client ip: " + str(cAddr)
@@ -261,6 +265,7 @@ while True:
                     if not window[x][1]:
                         packet, seqNum = constructPacket(1, x, window[x][0])
                         print "Sent " + str(x * elementSize) + " bytes"
+                        print "seqNum " + str(seqNum)
                         s.sendto(packet, cAddr)
                 #print "Listening for Acks"
                 ackedSeqNums = listenForAcks(s, window.keys())
@@ -268,6 +273,16 @@ while True:
                                                            f, seqPointer,
                                                            elementSize,
                                                            MAXSEQNUM)
+                if (seqPointer * elementSize) >= fileSize:
+                    for x in window.keys():
+                        if not window[x][1]:
+                            packet, seqNum = constructPacket(1, x, window[x][0])
+                            print "Sent " + str(x * elementSize) + " bytes"
+                            print "seqNum " + str(seqNum)
+                            s.sendto(packet, cAddr)
+                    ackedSeqNums = listenForAcks(s, window.keys())
+                    print "File Transfer Complete"
+                    break
 
     else:
         sizePacket = constructPacket(0, data=0)

@@ -75,8 +75,11 @@ with open(filename, mode) as f:
                 print "curSeq is " + str(curSeq)
                 f.write(ackPacketsDict[curSeq])
                 curSeq += 1
-            s.sendto(constructPacket(2, data=recvPacket[2]), addr)
-            print constructPacket(2, data=recvPacket[2])
+                s.sendto(constructPacket(2, data=recvPacket[2]), addr)
+                print constructPacket(2, data=recvPacket[2])
+                if totalByteRecv >= fileLength:
+                    print "File Received"
+                    sys.exit()
     # To check the hash take the received packet, decode the json, reencode the
     # json based on what is done in the server (extract to tools file?) and then
     # hash the new j;son string and check against the parsed hash/truncated hash
