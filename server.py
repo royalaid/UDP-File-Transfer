@@ -255,6 +255,8 @@ while True:
                 chunk = f.read(elementSize)
                 window[x] = (chunk, False)
                 seqPointer = x
+                if (elementSize * (x + 1)) > fileSize:
+                    break
 
             while fileIncomplete:
 
@@ -280,7 +282,8 @@ while True:
                             print "Sent " + str(x * elementSize) + " bytes"
                             print "seqNum " + str(seqNum)
                             s.sendto(packet, cAddr)
-                    ackedSeqNums = listenForAcks(s, window.keys())
+                    if len(window) > 0:
+                        ackedSeqNums = listenForAcks(s, window.keys())
                     print "File Transfer Complete"
                     break
 
