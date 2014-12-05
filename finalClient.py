@@ -15,6 +15,7 @@ logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 
 # Constants
 BYTES = 4
+WINDOWLEN = 10
 loop = True
 fileLength = 0
 
@@ -40,7 +41,7 @@ while True:
         filename += 'New'
     mode = 'wb'
 
-    s.sendto(reqPacket, ('148.61.162.105', 1236))
+    s.sendto(reqPacket, ('10.0.0.1', 1236))
 
     (data, addr) = s.recvfrom(1024)
     recvPacket = json.loads(data)
@@ -68,15 +69,26 @@ with open(filename, mode) as f:
         recvPacket = json.loads(data)
         if checkHash(recvPacket):
             ackPacketsDict[recvPacket[2]] = base64.decodestring(recvPacket[1])
-            if(recvPacket[2] == curSeq):
-                #print repr(ackPacketsDict[curSeq])
-                totalByteRecv += len(ackPacketsDict[curSeq])
-                print "The Bytes So far: " + str(totalByteRecv)
-                print "curSeq is " + str(curSeq)
-                f.write(ackPacketsDict[curSeq])
-                curSeq += 1
-                s.sendto(constructPacket(2, data=recvPacket[2]), addr)
-                print constructPacket(2, data=recvPacket[2])
+	    s.sendto(constructPacket(2, data=recvPacket[2]), addr)
+            print constructPacket(2, data=recvPacket[2])
+            if curSeq in ackPacketsDict.keys():
+                while True:
+		    try:
+		        print "current internal buffer::: "+repr(ackPacketsDict.keys())+" :::"
+			totalByteRecv += len(ackPacketsDict[curSeq])
+		        print "The Bytes So far: " + str(totalByteRecv)
+		        print "curSeq is " + str(curSeq)
+		        f.write(ackPacketsDict[curSeq])
+		        del ackPacketsDict[curSeq]
+			curSeq += 1
+			# clearing window 
+			for x in ackPacketsDict.keys():
+			  if x < curSeq:
+				del ackPacketsDict[x]
+		        print "current internal buffer::: "+repr(ackPacketsDict.keys())+" :::"
+			print "next desired packet? " + str(curSeq)
+		    except:
+		        break
                 if totalByteRecv >= fileLength:
                     print "File Received"
                     sys.exit()
