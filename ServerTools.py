@@ -19,7 +19,7 @@ def base64Len(num):
 
 
 def checkHash(packet):
-    print "Checking Hash"
+    #print "Checking Hash"
     # if checking an ack or request packet, only need to hash packet[0:2]
     i = 2
     # if checking a data packet, we'll need to hash packet[0:3]
@@ -31,10 +31,10 @@ def checkHash(packet):
     jsonPacket = json.dumps(packet[:i], separators=(',', ':'))
     hashGen = hashlib.sha1(jsonPacket.encode("UTF-8")).hexdigest()  # new hash
     if (hashGen == hashCheck):  # compare received and actual
-        print "Hash confirmed"
+        #print "Hash confirmed"
         return True
     else:
-        print "Hash invalid, packet corrupt"
+        #print "Hash invalid, packet corrupt"
         return False
 
 

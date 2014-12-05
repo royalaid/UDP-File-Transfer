@@ -17,9 +17,14 @@ logging.debug('+++++++++++++++++++++++++++++++++++++++++++')
 BYTES = 4
 loop = True
 fileLength = 0
+
+
 def getUserInput():
-    filename = raw_input("Please specify a file: \n").rstrip()
-    return filename
+    try:
+        fileName = sys.argv[1]
+    except Exception:
+        fileName = raw_input("Please specify a file: \n").rstrip()
+    return fileName
 
 
 ##########
@@ -32,9 +37,10 @@ while True:
     reqPacket = constructPacket(0, data=filename)
     # Makes new filename so we don't mess up the transferring file
     if os.path.isfile(filename):
-        filename += '_new'
+        filename += 'New'
+    mode = 'wb'
 
-    s.sendto(reqPacket, ('148.61.112.111', 1234))
+    s.sendto(reqPacket, ('148.61.112.111', 1236))
 
     (data, addr) = s.recvfrom(1024)
     recvPacket = json.loads(data)
@@ -48,27 +54,37 @@ while True:
             break
 
 # start connection
-startSeq = 0
+curSeq = 0
 ackPacketsDict = {}
-with open(filename, "wb") as f:
+totalByteRecv = 0
+with open(filename, mode) as f:
     while loop:  # not sure about connected TODO
         # configure sender ip
         # configure sequence number
 
         (data, addr) = s.recvfrom(1024)
-        print repr(data)
+        #print repr(data)
         # configure checksum
         recvPacket = json.loads(data)
         if checkHash(recvPacket):
             ackPacketsDict[recvPacket[2]] = base64.decodestring(recvPacket[1])
-            s.sendto(constructPacket(2, data=recvPacket[2]), addr)
-            print constructPacket(2, data=recvPacket[2])
+            if(recvPacket[2] == curSeq):
+                #print repr(ackPacketsDict[curSeq])
+                totalByteRecv += len(ackPacketsDict[curSeq])
+                print "The Bytes So far: " + str(totalByteRecv)
+                print "curSeq is " + str(curSeq)
+                f.write(ackPacketsDict[curSeq])
+                curSeq += 1
+                s.sendto(constructPacket(2, data=recvPacket[2]), addr)
+                print constructPacket(2, data=recvPacket[2])
+                if totalByteRecv >= fileLength:
+                    print "File Received"
+                    sys.exit()
     # To check the hash take the received packet, decode the json, reencode the
     # json based on what is done in the server (extract to tools file?) and then
     # hash the new j;son string and check against the parsed hash/truncated hash
 
     # determine if sending
-
 
     # at some point for with :
 
